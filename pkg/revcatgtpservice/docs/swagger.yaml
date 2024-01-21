@@ -1,0 +1,57 @@
+definitions:
+  revcatgtpservice.HTTPResultMessage:
+    properties:
+      code:
+        example: 400
+        type: integer
+      message:
+        example: status bad request
+        type: string
+    type: object
+info:
+  contact:
+    email: juergen@info-age.ch
+    name: Jürgen Enge
+    url: https://info-age.ch
+  description: Custom GPT Metadata for Revcat
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: RevcatGPT API
+  version: "1.0"
+paths:
+  /{query}:
+    get:
+      description: based on a GPT chat query, similar documents are searched and returned
+        as context
+      operationId: get-context-by-query
+      parameters:
+      - description: chat query
+        in: path
+        name: query
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/revcatgtpservice.HTTPResultMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/revcatgtpservice.HTTPResultMessage'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/revcatgtpservice.HTTPResultMessage'
+      summary: gets GPT query context to query
+      tags:
+      - GND
+swagger: "2.0"

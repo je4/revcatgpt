@@ -1,0 +1,83 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Custom GPT Metadata for Revcat",
+        "title": "RevcatGPT API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "Jürgen Enge",
+            "url": "https://info-age.ch",
+            "email": "juergen@info-age.ch"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "paths": {
+        "/{query}": {
+            "get": {
+                "description": "based on a GPT chat query, similar documents are searched and returned as context",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "GND"
+                ],
+                "summary": "gets GPT query context to query",
+                "operationId": "get-context-by-query",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "chat query",
+                        "name": "query",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/revcatgtpservice.HTTPResultMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/revcatgtpservice.HTTPResultMessage"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/revcatgtpservice.HTTPResultMessage"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "revcatgtpservice.HTTPResultMessage": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 400
+                },
+                "message": {
+                    "type": "string",
+                    "example": "status bad request"
+                }
+            }
+        }
+    }
+}
