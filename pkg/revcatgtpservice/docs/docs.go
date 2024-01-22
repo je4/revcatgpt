@@ -25,6 +25,57 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/json/{query}": {
+            "get": {
+                "description": "based on a GPT chat query, similar documents are searched and returned as context",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "GND"
+                ],
+                "summary": "gets GPT query context to query",
+                "operationId": "get-context-by-query-json",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "chat query",
+                        "name": "query",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/revcatgtpservice.HTTPJSONResultMessage"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/revcatgtpservice.HTTPResultMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/revcatgtpservice.HTTPResultMessage"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/revcatgtpservice.HTTPResultMessage"
+                        }
+                    }
+                }
+            }
+        },
         "/{query}": {
             "get": {
                 "description": "based on a GPT chat query, similar documents are searched and returned as context",
@@ -75,6 +126,35 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "revcatgtpservice.HTTPJSONResultMessage": {
+            "type": "object",
+            "properties": {
+                "abstract": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "place": {
+                    "type": "string"
+                },
+                "signature": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
         "revcatgtpservice.HTTPResultMessage": {
             "type": "object",
             "properties": {

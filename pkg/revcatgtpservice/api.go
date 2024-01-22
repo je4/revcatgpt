@@ -8,6 +8,7 @@ import (
 	"crypto/sha1"
 	"crypto/tls"
 	"emperror.dev/errors"
+	"encoding/json"
 	"fmt"
 	"github.com/Masterminds/sprig"
 	"github.com/bluele/gcache"
@@ -180,6 +181,7 @@ type controller struct {
 func (ctrl *controller) Init(cert *tls.Certificate) error {
 	v1 := ctrl.router.Group(BASEPATH)
 	v1.GET("/:query", ctrl.chatSearch)
+	v1.GET("/json/:query", ctrl.chatSearchJSON)
 
 	ctrl.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	//ctrl.router.StaticFS("/swagger/", http.FS(swaggerFiles.FS))
@@ -324,4 +326,133 @@ func (ctrl *controller) chatSearch(c *gin.Context) {
 	}
 	ctrl.logger.Info().Msgf("tokens: %d", tokens)
 	c.Data(http.StatusOK, "text/plain", []byte(context))
+}
+
+type HTTPJSONResultMessage struct {
+	Signature string   `json:"signature"`
+	URL       string   `json:"url"`
+	Title     string   `json:"title"`
+	Abstract  string   `json:"abstract"`
+	Tags      []string `json:"tags"`
+	Date      string   `json:"date"`
+	Place     string   `json:"place"`
+}
+
+// chatSearchJSON godoc
+// @Summary      gets GPT query context to query
+// @ID			 get-context-by-query-json
+// @Description  based on a GPT chat query, similar documents are searched and returned as context
+// @Tags         GND
+// @Produce      json
+// @Param		 query path string true "chat query"
+// @Success      200  {object}  []HTTPJSONResultMessage
+// @Failure      400  {object}  revcatgtpservice.HTTPResultMessage
+// @Failure      404  {object}  revcatgtpservice.HTTPResultMessage
+// @Failure      500  {object}  revcatgtpservice.HTTPResultMessage
+// @Router       /json/{query} [get]
+func (ctrl *controller) chatSearchJSON(c *gin.Context) {
+	var err error
+	query := c.Param("query")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, HTTPResultMessage{Message: "query is empty"})
+		return
+	}
+
+	var lang language.Tag
+	if lng, exists := ctrl.langDetector.DetectLanguageOf(query); exists {
+		lang, err = language.Parse(lng.IsoCode639_3().String())
+		if err != nil {
+			c.JSON(http.StatusBadRequest, HTTPResultMessage{Message: fmt.Sprintf("cannot parse language %s", lng.String())})
+			return
+		}
+	} else {
+		lang = language.English
+	}
+
+	key := sha1.Sum([]byte(query))
+	var embedding []float32
+	if embeddingInterface, err := ctrl.cache.Get(key); err == nil {
+		embedding, _ = embeddingInterface.([]float32)
+	}
+	if len(embedding) == 0 {
+		// Create an EmbeddingRequest for the user query
+		queryReq := openai.EmbeddingRequest{
+			Input: []string{query},
+			Model: openai.AdaEmbeddingV2,
+		}
+		embeddingResponse, err := ctrl.oaiClient.CreateEmbeddings(context.Background(), queryReq)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPResultMessage{Message: fmt.Sprintf("cannot create embedding for query %s - %v", query, err)})
+			return
+		}
+		if len(embeddingResponse.Data) == 0 {
+			c.JSON(http.StatusInternalServerError, HTTPResultMessage{Message: fmt.Sprintf("no embedding returned for query %s", query)})
+			return
+		}
+		embedding = embeddingResponse.Data[0].Embedding
+		ctrl.cache.Set(key, embedding)
+	}
+	var embedding64 = make([]float64, len(embedding))
+	for i, v := range embedding {
+		embedding64[i] = float64(v)
+	}
+
+	result, err := ctrl.client.VectorSearchShort(context.Background(), nil, embedding64, 30)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, HTTPResultMessage{Message: fmt.Sprintf("cannot search for query %s: %v", query, err)})
+		return
+	}
+	var context string
+	var tokens int
+	ret := []*HTTPJSONResultMessage{}
+	langStr := lang.String()
+	for _, edge := range result.VectorSearch.Edges {
+		jret := &HTTPJSONResultMessage{
+			Signature: edge.Base.Signature,
+			URL:       "https://performance.sammlung.cc/detail/" + edge.Base.Signature,
+			Tags:      edge.Base.Tags,
+		}
+		if edge.Base.Date != nil {
+			jret.Date = *edge.Base.Date
+		}
+		if edge.Base.Place != nil {
+			jret.Place = *edge.Base.Place
+		}
+		for _, t := range edge.Base.Title {
+			if t.Translated == false {
+				jret.Title = t.Value
+			}
+			if langStr == t.Lang {
+				jret.Title = t.Value
+				break
+			}
+		}
+		for _, t := range edge.Abstract {
+			if t.Translated == false {
+				jret.Abstract = t.Value
+			}
+			if langStr == t.Lang {
+				jret.Abstract = t.Value
+				break
+			}
+		}
+		ret = append(ret, jret)
+		buf, err := json.MarshalIndent(jret, "", "  ")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, HTTPResultMessage{Message: fmt.Sprintf("cannot marshal json for query %s: %v", query, err)})
+			return
+		}
+
+		tokens += NumTokensFromMessages([]openai.ChatCompletionMessage{
+			openai.ChatCompletionMessage{
+				Content: string(buf),
+			},
+		}, "gpt-4-0314")
+		context += fmt.Sprintf("%s\n\n---\n\n", buf)
+		if tokens > 3000 {
+			break
+		}
+	}
+	ctrl.logger.Info().Msgf("tokens: %d", tokens)
+	c.JSON(http.StatusOK, ret)
 }

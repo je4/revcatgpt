@@ -1,4 +1,23 @@
 definitions:
+  revcatgtpservice.HTTPJSONResultMessage:
+    properties:
+      abstract:
+        type: string
+      date:
+        type: string
+      place:
+        type: string
+      signature:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      url:
+        type: string
+    type: object
   revcatgtpservice.HTTPResultMessage:
     properties:
       code:
@@ -39,6 +58,41 @@ paths:
           description: OK
           schema:
             type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/revcatgtpservice.HTTPResultMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/revcatgtpservice.HTTPResultMessage'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/revcatgtpservice.HTTPResultMessage'
+      summary: gets GPT query context to query
+      tags:
+      - GND
+  /json/{query}:
+    get:
+      description: based on a GPT chat query, similar documents are searched and returned
+        as context
+      operationId: get-context-by-query-json
+      parameters:
+      - description: chat query
+        in: path
+        name: query
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/revcatgtpservice.HTTPJSONResultMessage'
+            type: array
         "400":
           description: Bad Request
           schema:
